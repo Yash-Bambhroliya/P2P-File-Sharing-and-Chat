@@ -107,12 +107,8 @@ function setupWebSocket(myId) {
         socket.close();
     }
 
-    // Use window.location to get the current hostname and port
-    const host = window.location.hostname;
-    const port = '8080'; // Replace this with your desired port if different
-
-    // Construct the WebSocket URL
-    const socketUrl = `wss:https://lovely-admitted-protest.glitch.me`;
+    // Directly use the WebSocket URL for production
+    const socketUrl = 'wss://lovely-admitted-protest.glitch.me';
     socket = new WebSocket(socketUrl);
 
     socket.onopen = () => {
