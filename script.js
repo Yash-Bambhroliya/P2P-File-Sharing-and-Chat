@@ -175,7 +175,7 @@ function showFileRequest(conn, data) {
 }
 
 function startFileTransfer(conn, file) {
-    const chunkSize = 2048 * 1024;
+    const chunkSize = 10240 * 1024;
     let offset = 0;
     const totalSize = file.size;
     const totalChunks = Math.ceil(totalSize / chunkSize);
