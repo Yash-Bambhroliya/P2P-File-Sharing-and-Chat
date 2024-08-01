@@ -1,4 +1,4 @@
-const peer = new Peer();
+let peer = new Peer();
 const fileInput = document.getElementById('file-input');
 const sendFileBtn = document.getElementById('send-file-btn');
 const progressBar = document.getElementById('progress-bar');
@@ -7,9 +7,13 @@ const speedText = document.getElementById('speed-text');
 const chatInput = document.getElementById('chat-input');
 const chatSend = document.getElementById('chat-send');
 const chatMessages = document.getElementById('chat-messages');
+const newPeerIdInput = document.getElementById('new-peer-id');
+const changePeerIdBtn = document.getElementById('change-peer-id-btn');
 
 let myPeerId = null;
 let selectedPeerId = null;
+let peersList = [];
+let socket = null;
 
 peer.on('open', (id) => {
     myPeerId = id;
@@ -17,17 +21,7 @@ peer.on('open', (id) => {
     setupWebSocket(id);
 });
 
-peer.on('connection', (conn) => {
-    conn.on('data', (data) => {
-        if (data.type === 'file-request') {
-            showFileRequest(conn, data);
-        } else if (data.type === 'file-chunk') {
-            receiveFileChunk(conn, data);
-        } else if (data.type === 'chat-message') {
-            displayChatMessage(data);
-        }
-    });
-});
+peer.on('connection', handleConnection);
 
 fileInput.addEventListener('change', () => {
     sendFileBtn.disabled = !fileInput.files.length;
@@ -73,17 +67,73 @@ chatSend.addEventListener('click', () => {
     }
 });
 
+changePeerIdBtn.addEventListener('click', () => {
+    const newPeerId = newPeerIdInput.value.trim();
+    if (newPeerId && !peersList.includes(newPeerId)) {
+        // Notify server to remove old ID
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ type: 'remove-peer', id: myPeerId }));
+        }
+
+        // Destroy the old Peer and create a new one with the new ID
+        peer.destroy();
+        peer = new Peer(newPeerId);
+        peer.on('open', (id) => {
+            myPeerId = id;
+            document.getElementById('my-peer-id').textContent = id;
+            setupWebSocket(id);
+        });
+        peer.on('connection', handleConnection);
+    } else {
+        alert('Peer ID already exists or is invalid. Please choose a different ID.');
+    }
+});
+
+function handleConnection(conn) {
+    conn.on('data', (data) => {
+        if (data.type === 'file-request') {
+            showFileRequest(conn, data);
+        } else if (data.type === 'file-chunk') {
+            receiveFileChunk(conn, data);
+        } else if (data.type === 'chat-message') {
+            displayChatMessage(data);
+        }
+    });
+}
+
 function setupWebSocket(myId) {
-    const socket = new WebSocket('ws://192.168.1.7:8080');
+    // Close previous socket if open
+    if (socket) {
+        socket.close();
+    }
+
+    // Use window.location to get the current hostname and port
+    const host = window.location.hostname;
+    const port = '8080'; // Replace this with your desired port if different
+
+    // Construct the WebSocket URL
+    const socketUrl = `ws://${host}:${port}`;
+    socket = new WebSocket(socketUrl);
+
     socket.onopen = () => {
+        console.log(`Connected to WebSocket server at ${socketUrl}`);
         socket.send(JSON.stringify({ type: 'new-peer', id: myId }));
     };
 
     socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
         if (data.type === 'peer-list') {
+            peersList = data.peers;
             updatePeerList(data.peers);
         }
+    };
+
+    socket.onerror = (error) => {
+        console.error('WebSocket error:', error);
+    };
+
+    socket.onclose = (event) => {
+        console.log('WebSocket connection closed:', event);
     };
 }
 
@@ -192,42 +242,16 @@ function receiveFileChunk(conn, data) {
     conn.fileChunks[chunkNumber - 1] = chunk;
     console.log(`Added chunk ${chunkNumber} to fileChunks array. Total chunks received: ${conn.fileChunks.length}`);
 
-    const receivedSize = conn.fileChunks.reduce((total, chunk) => total + (chunk ? chunk.byteLength : 0), 0);
-    progressBar.max = conn.fileSize;
+    const receivedSize = conn.fileChunks.reduce((total, chunk) => total + chunk.byteLength, 0);
     progressBar.value = receivedSize;
-    const percentComplete = ((receivedSize / progressBar.max) * 100).toFixed(2);
-    progressText.textContent = `Receiving file: ${percentComplete}%`;
-    console.log('Progress updated. Received size:', receivedSize, 'Max size:', progressBar.max, 'Progress:', percentComplete + '%');
+    const percentComplete = ((receivedSize / conn.fileSize) * 100).toFixed(2);
+    progressText.textContent = `Transfer progress: ${percentComplete}%`;
 
-    if (chunkNumber === totalChunks) {
-        console.log('File complete message received.');
-
-        const blob = new Blob(conn.fileChunks);
-        console.log('Blob created. Blob size:', blob.size);
-
-        if (blob.size === 0) {
-            console.error('Error: Blob size is zero, file might not have been received correctly.');
-            return;
-        }
-        const url = URL.createObjectURL(blob);
-        console.log('Object URL created:', url);
-        
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = fileName;
-
-        document.body.appendChild(link);
-        link.click();
-        console.log('Download triggered.');
-
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        console.log('Link removed and object URL revoked.');
-
-        conn.fileChunks = [];
-        progressText.textContent = 'Transfer complete!';
-        speedText.textContent = '';
-        console.log('File transfer complete!');
+    if (conn.fileChunks.length === totalChunks) {
+        console.log('All chunks received. Concatenating chunks...');
+        const fileBlob = new Blob(conn.fileChunks, { type: 'application/octet-stream' });
+        saveAs(fileBlob, fileName);
+        console.log('File saved:', fileName);
     }
 }
 
