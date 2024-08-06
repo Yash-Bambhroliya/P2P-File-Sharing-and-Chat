@@ -108,9 +108,9 @@ function setupWebSocket(myId) {
     if (socket) {
         socket.close();
     }
-    const host = window.location.hostname;
-    const port = '8080';
-    const socketUrl = `ws://${host}:${port}`;
+
+    // Directly use the WebSocket URL for production
+    const socketUrl = 'wss://lovely-admitted-protest.glitch.me';
     socket = new WebSocket(socketUrl);
 
     socket.onopen = () => {
@@ -174,7 +174,7 @@ function showFileRequest(conn, data) {
 }
 
 function startFileTransfer(conn, file) {
-    const chunkSize = 2048 * 1024;
+    const chunkSize = 10240 * 1024;
     let offset = 0;
     const totalSize = file.size;
     const totalChunks = Math.ceil(totalSize / chunkSize);
