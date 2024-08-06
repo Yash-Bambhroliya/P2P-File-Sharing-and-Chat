@@ -60,7 +60,7 @@ chatSend.addEventListener('click', () => {
                 message: message,
                 sender: myPeerId
             });
-            chatInput.value = '';
+            chatInput.value = ''; // Clear input after sending
         });
     } else {
         alert('Select a peer and type a message.');
@@ -70,9 +70,12 @@ chatSend.addEventListener('click', () => {
 changePeerIdBtn.addEventListener('click', () => {
     const newPeerId = newPeerIdInput.value.trim();
     if (newPeerId && !peersList.includes(newPeerId)) {
+        // Notify server to remove old ID
         if (socket && socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({ type: 'remove-peer', id: myPeerId }));
         }
+
+        // Destroy the old Peer and create a new one with the new ID
         peer.destroy();
         peer = new Peer(newPeerId);
         peer.on('open', (id) => {
@@ -105,12 +108,17 @@ function handleConnection(conn) {
 }
 
 function setupWebSocket(myId) {
+    // Close previous socket if open
     if (socket) {
         socket.close();
     }
 
-    // Directly use the WebSocket URL for production
-    const socketUrl = 'wss://lovely-admitted-protest.glitch.me';
+    // Use window.location to get the current hostname and port
+    const host = window.location.hostname;
+    const port = '8080'; // Replace this with your desired port if different
+
+    // Construct the WebSocket URL
+    const socketUrl = `ws://${host}:${port}`;
     socket = new WebSocket(socketUrl);
 
     socket.onopen = () => {
@@ -156,12 +164,15 @@ function updatePeerList(peers) {
 
 function showFileRequest(conn, data) {
     console.log('File request received. Data:', data);
+
     const { fileName, fileSize } = data;
     if (!fileName || !fileSize) {
         console.error('Error: File name or size is missing.');
         return;
     }
+
     console.log('File name:', fileName, 'File size:', fileSize);
+    
     const accept = confirm(`Peer wants to send you a file: ${fileName}. Do you accept?`);
     if (accept) {
         conn.fileSize = fileSize;
@@ -174,7 +185,7 @@ function showFileRequest(conn, data) {
 }
 
 function startFileTransfer(conn, file) {
-    const chunkSize = 10240 * 1024;
+    const chunkSize = 2048 * 1024;
     let offset = 0;
     const totalSize = file.size;
     const totalChunks = Math.ceil(totalSize / chunkSize);
@@ -260,5 +271,5 @@ function displayChatMessage(data) {
     const messageElement = document.createElement('div');
     messageElement.textContent = `${sender}: ${message}`;
     chatMessages.appendChild(messageElement);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    chatMessages.scrollTop = chatMessages.scrollHeight; // Scroll to the latest message
 }

@@ -1,4 +1,4 @@
-let peer = new Peer();
+let peer = null;
 const fileInput = document.getElementById('file-input');
 const sendFileBtn = document.getElementById('send-file-btn');
 const progressBar = document.getElementById('progress-bar');
@@ -15,13 +15,16 @@ let selectedPeerId = null;
 let peersList = [];
 let socket = null;
 
-peer.on('open', (id) => {
-    myPeerId = id;
-    document.getElementById('my-peer-id').textContent = id;
-    setupWebSocket(id);
-});
+function initializePeer() {
+    peer = new Peer(); // Create a new Peer without an initial ID
+    peer.on('open', (id) => {
+        myPeerId = id;
+        document.getElementById('my-peer-id').textContent = id;
+        setupWebSocket(id); // Register with the WebSocket server
+    });
 
-peer.on('connection', handleConnection);
+    peer.on('connection', handleConnection);
+}
 
 fileInput.addEventListener('change', () => {
     sendFileBtn.disabled = !fileInput.files.length;
@@ -60,7 +63,7 @@ chatSend.addEventListener('click', () => {
                 message: message,
                 sender: myPeerId
             });
-            chatInput.value = '';
+            chatInput.value = ''; // Clear input after sending
         });
     } else {
         alert('Select a peer and type a message.');
@@ -70,17 +73,14 @@ chatSend.addEventListener('click', () => {
 changePeerIdBtn.addEventListener('click', () => {
     const newPeerId = newPeerIdInput.value.trim();
     if (newPeerId && !peersList.includes(newPeerId)) {
+        // Notify server to remove old ID and update with new ID
         if (socket && socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({ type: 'remove-peer', id: myPeerId }));
         }
+
+        // Destroy the old Peer and create a new one with the new ID
         peer.destroy();
-        peer = new Peer(newPeerId);
-        peer.on('open', (id) => {
-            myPeerId = id;
-            document.getElementById('my-peer-id').textContent = id;
-            setupWebSocket(id);
-        });
-        peer.on('connection', handleConnection);
+        initializePeer(); // Reinitialize the peer with the new ID
     } else {
         alert('Peer ID already exists or is invalid. Please choose a different ID.');
     }
@@ -109,8 +109,9 @@ function setupWebSocket(myId) {
         socket.close();
     }
 
-    // Directly use the WebSocket URL for production
-    const socketUrl = 'wss://lovely-admitted-protest.glitch.me';
+    const host = window.location.hostname;
+    const port = '8080';
+    const socketUrl = `ws://${host}:${port}`;
     socket = new WebSocket(socketUrl);
 
     socket.onopen = () => {
@@ -156,12 +157,15 @@ function updatePeerList(peers) {
 
 function showFileRequest(conn, data) {
     console.log('File request received. Data:', data);
+
     const { fileName, fileSize } = data;
     if (!fileName || !fileSize) {
         console.error('Error: File name or size is missing.');
         return;
     }
+
     console.log('File name:', fileName, 'File size:', fileSize);
+    
     const accept = confirm(`Peer wants to send you a file: ${fileName}. Do you accept?`);
     if (accept) {
         conn.fileSize = fileSize;
@@ -174,7 +178,7 @@ function showFileRequest(conn, data) {
 }
 
 function startFileTransfer(conn, file) {
-    const chunkSize = 10240 * 1024;
+    const chunkSize = 2 * 1024 * 1024; // 2MB chunks
     let offset = 0;
     const totalSize = file.size;
     const totalChunks = Math.ceil(totalSize / chunkSize);
@@ -260,5 +264,8 @@ function displayChatMessage(data) {
     const messageElement = document.createElement('div');
     messageElement.textContent = `${sender}: ${message}`;
     chatMessages.appendChild(messageElement);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    chatMessages.scrollTop = chatMessages.scrollHeight; // Scroll to the latest message
 }
+
+// Initialize the peer when the script loads
+initializePeer();
