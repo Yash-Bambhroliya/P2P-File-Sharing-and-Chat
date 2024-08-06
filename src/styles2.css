@@ -1,0 +1,31 @@
+#container {
+    text-align: center;
+    padding: 20px;
+  }
+  
+  #peer-info, #peer-list, #file-section, #progress-section, #chat-container {
+    margin: 10px 0;
+  }
+  
+  #progress-bar {
+    width: 100%;
+  }
+  
+  #chat-messages {
+    height: 200px;
+    overflow-y: scroll;
+    border: 1px solid #ddd;
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+  
+  #chat-input-section {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  #chat-input-section input {
+    margin-right: 10px;
+  }
+  

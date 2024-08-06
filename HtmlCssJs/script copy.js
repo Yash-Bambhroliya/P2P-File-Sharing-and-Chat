@@ -91,12 +91,18 @@ changePeerIdBtn.addEventListener('click', () => {
 
 function handleConnection(conn) {
     conn.on('data', (data) => {
-        if (data.type === 'file-request') {
-            showFileRequest(conn, data);
-        } else if (data.type === 'file-chunk') {
-            receiveFileChunk(conn, data);
-        } else if (data.type === 'chat-message') {
-            displayChatMessage(data);
+        switch (data.type) {
+            case 'file-request':
+                showFileRequest(conn, data);
+                break;
+            case 'file-chunk':
+                receiveFileChunk(conn, data);
+                break;
+            case 'chat-message':
+                displayChatMessage(data);
+                break;
+            default:
+                console.error('Unknown data type:', data.type);
         }
     });
 }
